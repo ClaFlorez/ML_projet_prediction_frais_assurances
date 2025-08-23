@@ -1,332 +1,217 @@
+# README — Utilisation des bibliothèques et Évaluation du modèle
 
-# Projet de Régression des Frais d’Assurance — Documentation Technique (README)
-
-Ce dépôt présente une implémentation orientée-objet d’un pipeline de **régression des frais d’assurance** à partir du dataset `insurance.csv`.  
-Les méthodes de la classe `PredictreurAssurance` sont documentées **ligne par ligne**, avec les **formules mathématiques** associées lorsque pertinent.
-
-## Table des matières
-1. [Prérequis et données](#prérequis-et-données)  
-2. [Classe `PredictreurAssurance` : vue d’ensemble](#classe-predictreurassurance--vue-densemble)  
-3. [Méthode `nettoyer_donnees()`](#méthode-nettoyer_donnees) — nettoyage complet  
-4. [Méthode `pretraiter_donnees()`](#méthode-pretraiter_donnees) — encodage & split 80/20  
-5. [Méthode `entrainer_modele(degre=1)`](#méthode-entrainer_modeledegre1) — linéaire ou polynomiale  
-6. [Méthode `predire()`](#méthode-predire) — prédictions sur le test  
-7. [Méthode `evaluer()`](#méthode-evaluer) — MSE, RMSE, R² et scatter  
-8. [Méthode `visualiser()`](#méthode-visualiser) — graphiques complémentaires  
-9. [Méthode `diagnostiquer()`](#méthode-diagnostiquer) — tableau de bord rapide  
-10. [Annexe : corrélations (optionnel)](#annexe--corrélations-optionnel)  
+Ce document explique **l’utilisation de chaque bibliothèque** dans un flux typique de régression avec `scikit-learn` et présente en détail les **principales métriques d’évaluation**.
 
 ---
 
-## Prérequis et données
+## 1) Exemple de code et utilisation des bibliothèques
 
-- Python 3.10+ recommandé
-- Bibliothèques : `pandas`, `numpy`, `scikit-learn`, `matplotlib`, `seaborn`
-- Données : `insurance.csv` (hébergé sur Kaggle, lien « raw » GitHub possible)
-
-Exemple de chemin GitHub (mode *raw*) :
-```
-https://raw.githubusercontent.com/ClaFlorez/ML_projet_prediction_frais_assurances/main/insurance.csv
-```
-
----
-
-## Classe `PredictreurAssurance` : vue d’ensemble
-
-La classe encapsule les étapes suivantes :
-- Chargement du CSV dans `self.assurances`
-- Nettoyage : conversions de types, NA critiques, doublons → `self.df_clean` et `self.data_complet`
-- Prétraitement : encodage One-Hot des catégorielles, séparation train/test (80/20)
-- Entraînement : régression linéaire ou polynomiale
-- Prédiction, évaluation et visualisation
-
-Exemple d’usage minimal :
 ```python
-df_predictor = PredictreurAssurance(PATH_ASSURANCES)
-df_predictor.nettoyer_donnees()
-df_predictor.pretraiter_donnees()
-df_predictor.entrainer_modele(degre=1)
-df_predictor.diagnostiquer()
-```
+# ============================
+# IMPORTS
+# ============================
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
 
----
-
-## Méthode `nettoyer_donnees()`
-
-### Rôle
-Préparer un jeu de données propre et cohérent. Au terme de cette méthode, `self.df_clean` contient une copie nettoyée de `self.assurances` et `self.data_complet` peut pointer vers la même version.
-
-### Code canonique (extrait simplifié)
-```python
-def nettoyer_donnees(self):
-    self._convertir_types()
-    self._gerer_valeurs_manquantes()
-    self._supprimer_doublons()
-    self.df_clean = self.assurances.copy()
-    self.data_complet = self.df_clean.copy()
-```
-
-### Explication ligne par ligne
-1. `self._convertir_types()`  
-   - Convertit les colonnes numériques en types adaptés. Par exemple :
-     ```python
-     self.assurances['age'] = pd.to_numeric(self.assurances['age'], errors='coerce').astype('Int64')
-     self.assurances['bmi'] = pd.to_numeric(self.assurances['bmi'], errors='coerce').astype('float64')
-     self.assurances['charges'] = pd.to_numeric(self.assurances['charges'], errors='coerce').astype('float64')
-     self.assurances['children'] = pd.to_numeric(self.assurances['children'], errors='coerce').astype('Int64')
-     ```
-   - `errors='coerce'` force les valeurs invalides en `NaN` (qui seront gérées ensuite).  
-   - Les colonnes catégorielles (`sex`, `smoker`, `region`) sont normalisées (`str.strip()`, remplacement de `nan` textuels par `pd.NA`).
-
-2. `self._gerer_valeurs_manquantes()`  
-   - Supprime les lignes avec `NaN` dans **les colonnes critiques** : `age`, `smoker`, `bmi`, `charges`.
-   - Raison : `charges` est la **cible** et doit être observée; `age`, `smoker`, `bmi` sont des *features* majeures.
-   - Après suppression, la taille du DataFrame est affichée.
-
-3. `self._supprimer_doublons()`  
-   - Élimine les lignes dupliquées via `drop_duplicates()`.
-   - Affiche le nombre de lignes supprimées.
-
-4. `self.df_clean = self.assurances.copy()`  
-   - Fige une **copie propre** pour l’EDA et le prétraitement.
-
-5. `self.data_complet = self.df_clean.copy()`  
-   - Pointeur pratique pour la suite (peut rester identique à `df_clean` à ce stade).
-
----
-
-## Méthode `pretraiter_donnees()`
-
-### Rôle
-Transformer les variables catégorielles en indicatrices (One-Hot) et séparer les données en **train/test**.
-
-### Code canonique (extrait)
-```python
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import OneHotEncoder
-from sklearn.compose import ColumnTransformer
-
-def pretraiter_donnees(self, test_size=0.2, random_state=42):
-    X = self.df_clean.drop("charges", axis=1)
-    y = self.df_clean["charges"]
-
-    colonnes_cat = ["sex", "smoker", "region"]
-    colonnes_existantes = [c for c in colonnes_cat if c in X.columns]
-
-    self.preprocessor = ColumnTransformer(
-        transformers=[
-            ("cat", OneHotEncoder(drop="first", handle_unknown="ignore"), colonnes_existantes)
-        ],
-        remainder="passthrough"
-    )
-
-    X_transforme = self.preprocessor.fit_transform(X)
-
-    self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
-        X_transforme, y, test_size=test_size, random_state=random_state
-    )
-```
-
-### Explication ligne par ligne
-- `X = self.df_clean.drop("charges", axis=1)` et `y = self.df_clean["charges"]`  
-  - Séparent **features** et **cible**.  
-  - Notation : soit \( X \in \mathbb{R}^{n \times p} \), \( y \in \mathbb{R}^n \).
-
-- `colonnes_existantes`  
-  - Filtre des colonnes catégorielles présentes afin d’éviter les erreurs si une colonne manque.
-
-- `ColumnTransformer(...)` avec `OneHotEncoder(drop="first", handle_unknown="ignore")`  
-  - Encodage One-Hot : pour une variable catégorielle \( C \) à \( K \) modalités \( \{c_1,\dots,c_K\} \), on crée \( K-1 \) colonnes indicatrices  
-    \[
-    \phi_k(C) = \mathbb{1}[C = c_k], \quad k=1,\dots,K-1.
-    \]  
-  - `drop="first"` retire une colonne de référence pour éviter la **multicolinéarité parfaite** (piège des variables fictives).  
-  - `handle_unknown="ignore"` évite une erreur si une catégorie nouvelle apparaît en prédiction.  
-  - `remainder="passthrough"` conserve les colonnes numériques telles quelles.
-
-- `X_transforme = self.preprocessor.fit_transform(X)`  
-  - Apprend l’encodage sur le **train** et transforme \( X \) en matrice numérique \( \tilde{X} \).
-
-- `train_test_split(..., test_size=0.2, ...)`  
-  - Partitionne \( \tilde{X} \) et \( y \) en 80 % **train** et 20 % **test**.  
-  - Notation : \( (X_{\text{train}}, y_{\text{train}}), (X_{\text{test}}, y_{\text{test}}) \).
-
----
-
-## Méthode `entrainer_modele(degre=1)`
-
-### Rôle
-Ajuster un modèle de régression linéaire (degré 1) ou polynomiale (degré \( d>1 \)).
-
-### Code canonique (extrait)
-```python
 from sklearn.linear_model import LinearRegression
-from sklearn.preprocessing import PolynomialFeatures
+from sklearn.preprocessing import PolynomialFeatures, OneHotEncoder
+from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 
-def entrainer_modele(self, degre=1):
-    if degre == 1:
-        self.modele = LinearRegression()
-    else:
-        self.modele = Pipeline([
-            ("poly", PolynomialFeatures(degree=degre, include_bias=False)),
-            ("linreg", LinearRegression())
-        ])
-    self.modele.fit(self.X_train, self.y_train)
+# ============================
+# DONNÉES D’EXEMPLE
+# ============================
+df = pd.DataFrame({
+    "age":[19,23,31,45,52,60,21,47],
+    "bmi":[27.9,23.1,31.2,28.5,33.1,29.4,24.2,30.8],
+    "children":[0,1,2,2,3,0,1,2],
+    "sex":["female","male","female","male","female","male","female","male"],
+    "smoker":["yes","no","no","no","yes","no","no","yes"],
+    "region":["southwest","southeast","northwest","northeast","southeast","southwest","northeast","northwest"],
+    "charges":[16884.92,1826.84,46200.0,9782.9,44400.1,14000.0,2200.45,39000.0]
+})
+
+print(df.head())
+
+# Visualisation exploratoire
+plt.figure()
+sns.scatterplot(data=df, x="bmi", y="charges", hue="smoker")
+plt.title("Relation BMI vs Charges (color = fumeur)")
+plt.tight_layout()
+plt.show()
+
+# ============================
+# PRÉTRAITEMENT
+# ============================
+categorical_features = ["sex", "smoker", "region"]
+numerical_features   = ["age", "bmi", "children"]
+
+preprocessor = ColumnTransformer(
+    transformers=[("onehot", OneHotEncoder(handle_unknown="ignore"), categorical_features)],
+    remainder="passthrough"
+)
+
+poly = PolynomialFeatures(degree=2, include_bias=False)
+
+# ============================
+# PIPELINE COMPLET
+# ============================
+pipe = Pipeline(steps=[
+    ("preprocess", preprocessor),
+    ("poly", poly),
+    ("model", LinearRegression())
+])
+
+# ============================
+# TRAIN / TEST SPLIT
+# ============================
+X = df.drop(columns=["charges"])
+y = df["charges"]
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)
+
+# ============================
+# ENTRAÎNEMENT ET PRÉDICTION
+# ============================
+pipe.fit(X_train, y_train)
+y_pred_train = pipe.predict(X_train)
+y_pred_test  = pipe.predict(X_test)
+
+# ============================
+# ÉVALUATION
+# ============================
+mse_train = mean_squared_error(y_train, y_pred_train)
+mse_test  = mean_squared_error(y_test, y_pred_test)
+rmse_train = np.sqrt(mse_train)
+rmse_test  = np.sqrt(mse_test)
+r2_train = r2_score(y_train, y_pred_train)
+r2_test  = r2_score(y_test, y_pred_test)
+
+print(f"MSE  (train): {mse_train:.2f} | (test): {mse_test:.2f}")
+print(f"RMSE (train): {rmse_train:.2f} | (test): {rmse_test:.2f}")
+print(f"R²   (train): {r2_train:.4f} | (test): {r2_test:.4f}")
+
+# Diagramme des résidus
+residuals = y_test - y_pred_test
+plt.figure()
+sns.scatterplot(x=y_pred_test, y=residuals)
+plt.axhline(0, linestyle="--")
+plt.xlabel("Prédiction")
+plt.ylabel("Résidu (y_true - y_pred)")
+plt.title("Diagramme des résidus (jeu de test)")
+plt.tight_layout()
+plt.show()
 ```
 
-### Explication et formules
-- **Régression linéaire**  
-  - Modèle : \( \hat{y} = X \beta \).  
-  - Estimateur des **moindres carrés ordinaires** (MCO) :  
-    \[
-    \hat{\beta} = (X^\top X)^{-1} X^\top y,
-    \]  
-    lorsque \( X^\top X \) est inversible.
-
-- **Régression polynomiale** (via `PolynomialFeatures`)  
-  - Extension des features : pour \( x = (x_1,\dots,x_p) \), on crée toutes les combinaisons jusqu’au degré \( d \) (sans le biais si `include_bias=False`).  
-  - Exemple \( p=2, d=2 \) : \( [x_1, x_2, x_1^2, x_1x_2, x_2^2] \).  
-  - Le modèle reste **linéaire en les paramètres** mais non linéaire en les **features** transformées.
-
-- `self.modele.fit(self.X_train, self.y_train)`  
-  - Ajuste les paramètres \(\hat{\beta}\) (ou du pipeline) sur l’ensemble d’entraînement.
+### Utilisation des bibliothèques
+- **NumPy (`np`)** : calculs numériques, racine carrée pour RMSE.  
+- **Pandas (`pd`)** : création et manipulation de DataFrame.  
+- **Matplotlib (`plt`)** : figures et graphiques de base.  
+- **Seaborn (`sns`)** : visualisations statistiques avec style amélioré.  
+- **`train_test_split`** : séparation apprentissage/test.  
+- **`LinearRegression`** : modèle de régression linéaire.  
+- **`PolynomialFeatures`** : expansion polynomiale des variables numériques.  
+- **`OneHotEncoder`** : encodage des variables catégorielles.  
+- **`mean_squared_error`, `r2_score`** : évaluation quantitative du modèle.  
+- **`ColumnTransformer`** : application de transformations par type de colonne.  
+- **`Pipeline`** : enchaînement du prétraitement et du modèle.  
 
 ---
 
-## Méthode `predire()`
+## 2) Métriques d’évaluation de la régression
 
-### Rôle
-Produire les prédictions du modèle sur le jeu de test par défaut.
-
-### Code canonique (extrait)
-```python
-def predire(self, X=None):
-    if self.modele is None:
-        raise ValueError("Modèle non entraîné.")
-    if X is None:
-        X = self.X_test
-    y_pred = self.modele.predict(X)
-    return y_pred
-```
-
-### Explication
-- Contrôles d’usage : modèle entraîné et données de test disponibles.  
-- `self.modele.predict(X)` calcule \(\hat{y}\) :  
-  \[
-  \hat{y} = X \hat{\beta} \quad \text{(ou } \hat{y} = \Phi(X)\hat{\beta} \text{ si polynômial)}
-  \]
-  où \(\Phi(\cdot)\) désigne la transformation polynomiale si utilisée.
-
----
-
-## Méthode `evaluer()`
-
-### Rôle
-Calculer **MSE**, **RMSE**, **R²** et tracer le **scatter** \( y_{\text{test}} \) vs \(\hat{y}\).
-
-### Code canonique (extrait)
-```python
-from sklearn.metrics import mean_squared_error, r2_score
-import numpy as np
-import matplotlib.pyplot as plt
-
-def evaluer(self, afficher_graphique=True, retourner_scores=True):
-    y_pred = self.modele.predict(self.X_test)
-    mse = mean_squared_error(self.y_test, y_pred)
-    rmse = np.sqrt(mse)
-    r2 = r2_score(self.y_test, y_pred)
-    if afficher_graphique:
-        plt.figure(figsize=(6,5))
-        plt.scatter(self.y_test, y_pred, alpha=0.6)
-        m = min(self.y_test.min(), y_pred.min())
-        M = max(self.y_test.max(), y_pred.max())
-        plt.plot([m, M], [m, M], linestyle="--")
-        plt.xlabel("Valeurs réelles (y_test)"); plt.ylabel("Prédictions (y_pred)")
-        plt.title("Prédictions vs Valeurs réelles"); plt.tight_layout(); plt.show()
-    if retourner_scores:
-        return {"mse": mse, "rmse": rmse, "r2": r2}
-```
-
-### Formules
-- **MSE** (erreur quadratique moyenne) :  
-  \[
-  \mathrm{MSE} = \frac{1}{n}\sum_{i=1}^{n} (y_i - \hat{y}_i)^2.
-  \]
-- **RMSE** :  
-  \[
-  \mathrm{RMSE} = \sqrt{\mathrm{MSE}}.
-  \]
-- **\(R^2\)** (coefficient de détermination) :  
-  \[
-  R^2 = 1 - \frac{\sum_{i=1}^{n}(y_i - \hat{y}_i)^2}{\sum_{i=1}^{n}(y_i - \bar{y})^2},
-  \]
-  où \( \bar{y} = \frac{1}{n}\sum_{i=1}^{n} y_i \).
-
-- **Scatter** et diagonale idéale** : la ligne en pointillé \( y = x \) indique des prédictions parfaites.
-
----
-
-## Méthode `visualiser()`
-
-### Rôle
-Produire des visualisations complémentaires : scatter \( y_{\text{test}} \) vs \(\hat{y}\) ou distribution des résidus.
-
-### Code canonique (extrait)
-```python
-def visualiser(self, type_plot="scatter"):
-    y_pred = self.modele.predict(self.X_test)
-    if type_plot == "scatter":
-        # scatter y_test vs y_pred + diagonale
-        ...
-    elif type_plot == "residus":
-        residus = self.y_test - y_pred
-        # histogramme des résidus
-        ...
-```
-
-### Explications
-- **Résidus** : \( r_i = y_i - \hat{y}_i \). Une distribution centrée autour de 0 est souhaitable.  
-- L’analyse visuelle complète les métriques quantitatives.
-
----
-
-## Méthode `diagnostiquer()`
-
-### Rôle
-Fournir un tableau de bord rapide : métriques + scatter + histogramme des résidus.
-
-### Code canonique (extrait)
-```python
-def diagnostiquer(self, afficher_scores=True):
-    y_pred = self.modele.predict(self.X_test)
-    residus = self.y_test - y_pred
-    mse = mean_squared_error(self.y_test, y_pred)
-    rmse = np.sqrt(mse)
-    r2 = r2_score(self.y_test, y_pred)
-    # scatter y_test vs y_pred + diagonale
-    # histogramme des résidus
-    return {"mse": mse, "rmse": rmse, "r2": r2}
-```
-
-### Interprétation
-- **MSE/RMSE** bas et **\(R^2\)** élevé indiquent une meilleure performance.  
-- Le scatter proche de la diagonale et des résidus centrés autour de 0 suggèrent un modèle bien calibré.
-
----
-
-## Annexe : corrélations (optionnel)
-
-On peut créer des variables binaires simples pour `smoker` et `sex` et calculer la matrice de corrélation de Pearson.  
-Formule de la corrélation de Pearson entre variables \(X\) et \(Y\) :  
+### 2.1. MSE — Mean Squared Error
 \[
-\rho_{X,Y} = \frac{\sum_{i=1}^{n}(X_i - \bar{X})(Y_i - \bar{Y})}{\sqrt{\sum_{i=1}^{n}(X_i - \bar{X})^2}\, \sqrt{\sum_{i=1}^{n}(Y_i - \bar{Y})^2}}.
+MSE = \frac{1}{n} \sum_{i=1}^{n} (y_i - \hat{y}_i)^2
+\]
+- Moyenne des carrés des erreurs.  
+- Très sensible aux valeurs aberrantes.  
+- Exprimé dans l’unité au carré de la variable cible.
+
+### 2.2. RMSE — Root Mean Squared Error
+\[
+RMSE = \sqrt{MSE}
+\]
+- Racine carrée du MSE, donc dans la même unité que \(y\).  
+- Plus interprétable que le MSE.  
+- Comparez-le à l’écart-type de \(y\) pour juger la qualité du modèle.
+
+### 2.3. MAE — Mean Absolute Error
+\[
+MAE = \frac{1}{n} \sum_{i=1}^{n} |y_i - \hat{y}_i|
+\]
+- Moyenne des valeurs absolues des erreurs.  
+- Plus robuste aux valeurs aberrantes.  
+- Si RMSE >> MAE, cela indique la présence d’outliers.
+
+```python
+from sklearn.metrics import mean_absolute_error
+mae_test = mean_absolute_error(y_test, y_pred_test)
+```
+
+### 2.4. R² — Coefficient de détermination
+\[
+R^2 = 1 - \frac{\sum (y_i - \hat{y}_i)^2}{\sum (y_i - \bar{y})^2}
+\]
+- Mesure la proportion de variance expliquée par le modèle.  
+- Peut être négatif si le modèle est moins performant qu’une moyenne simple.  
+
+**R² ajusté** corrige l’inflation artificielle liée au nombre de variables :
+\[
+R^2_{adj} = 1 - (1 - R^2) \cdot \frac{n - 1}{n - p - 1}
 \]
 
+```python
+p = pipe[:-1].transform(X_test).shape[1]
+n = len(y_test)
+r2_adj = 1 - (1 - r2_test) * (n - 1) / (n - p - 1)
+```
+
+### 2.5. MAPE — Mean Absolute Percentage Error
+\[
+MAPE = \frac{100}{n} \sum \left|\frac{y_i - \hat{y}_i}{y_i}\right|
+\]
+- Erreur en pourcentage, utile pour l’interprétation métier.  
+- Attention : instable si \(y\) contient des valeurs proches de zéro.
+
+### 2.6. Validation croisée
+- Une seule séparation train/test peut être instable.  
+- La validation croisée permet d’obtenir une estimation plus robuste.
+
+```python
+from sklearn.model_selection import cross_val_score
+from sklearn.metrics import mean_squared_error
+import numpy as np
+
+def rmse_scorer(estimator, X, y):
+    y_hat = estimator.fit(X, y).predict(X)
+    return -np.sqrt(mean_squared_error(y, y_hat))
+
+cv_scores = cross_val_score(pipe, X, y, cv=5, scoring=rmse_scorer)
+print("RMSE CV (5 folds):", -cv_scores.mean(), "+/-", cv_scores.std())
+```
+
+### 2.7. Analyse des résidus
+- Vérification des hypothèses : linéarité, homoscédasticité, indépendance, normalité approximative.  
+- Graphiques utiles :  
+  - résidus vs prédictions,  
+  - histogramme ou QQ-plot des résidus.  
+
+```python
+import scipy.stats as stats
+stats.probplot(residuals, dist="norm", plot=plt)
+plt.title("QQ-plot des résidus (test)")
+plt.show()
+```
+
 ---
 
-## Bonnes pratiques
-- Vérifier la présence d’outliers et la stabilité des coefficients (Ridge/Lasso en cas de multicolinéarité).
-- Utiliser une validation croisée pour choisir le degré polynomial.
-- Sérialiser le modèle (ex. `joblib`) pour une utilisation ultérieure.
-
+## 3) Points clés pour choisir les métriques
+- Si les grandes erreurs coûtent cher → privilégier **RMSE/MSE**.  
+- Si présence d’outliers → consulter aussi **MAE**.  
+- Pour comparer modèles complexes → utiliser **R² ajusté**.  
+- Pour interprétation métier → **MAPE** si valeurs de y pas proches de zéro.  
+- Toujours valider avec **cross-validation** et analyser les résidus.  
