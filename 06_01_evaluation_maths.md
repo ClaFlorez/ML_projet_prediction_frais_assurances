@@ -51,7 +51,7 @@ J = (1/(2*m)) * np.sum((y_pred - y_true)**2)
 
 La fonction de coût est convexe et possède un minimum unique.  
 
-![Fonction de coût](sandbox:/mnt/data/fonction_cout_regression.png)  
+![Fonction de coût](fonction_cout_regression (1).png)  
 
 Le minimum est atteint pour la valeur optimale du paramètre \(\theta\).  
 
@@ -96,7 +96,7 @@ MAE = 0.5
 
 ## 6. Comparaison graphique des métriques
 
-![Comparaison MAE, RMSE, MSE](sandbox:/mnt/data/comparaison_MAE_MSE_RMSE.png)  
+![Comparaison MAE, RMSE, MSE](comparaison_MAE_MSE_RMSE.png)  
 
 ### Interprétation
 - **MAE** : mesure simple et robuste, moins influencée par les grandes erreurs.  
@@ -121,26 +121,26 @@ MAE = 0.5
 ![MSE](formula_mse.png)
 
 - RMSE  
-![RMSE](sandbox:/mnt/data/formula_rmse.png)
+![RMSE](formula_rmse.png)
 
 - MAE  
-![MAE](sandbox:/mnt/data/formula_mae.png)
+![MAE](formula_mae.png)
 
 - R²  
-![R²](sandbox:/mnt/data/formula_r2.png)
+![R²](formula_r2.png)
 
 - Fonction de coût J(θ)  
-![Fonction de coût](sandbox:/mnt/data/formula_cost.png)
+![Fonction de coût](formula_cost.png)
 
 ## Graphiques pédagogiques
 - Exemple MSE (segments = résidus, la somme des carrés correspond au MSE)  
-![Exemple MSE](sandbox:/mnt/data/mse_exemple.png)
+![Exemple MSE](mse_exemple.png)
 
 - Exemple MAE (segments = |résidus|, la somme des valeurs absolues correspond au MAE)  
-![Exemple MAE](sandbox:/mnt/data/mae_exemple.png)
+![Exemple MAE](mae_exemple.png)
 
 - Fonction de coût (parabole convexe avec minimum en θ optimal)  
-![Fonction de coût](sandbox:/mnt/data/fonction_cout_regression.png)
+![Fonction de coût](fonction_cout_regression (1).png)
 
 - Comparaison des métriques (MAE, RMSE, MSE)  
-![Comparaison](sandbox:/mnt/data/comparaison_MAE_MSE_RMSE.png)
+![Comparaison](comparaison_MAE_MSE_RMSE.png)
