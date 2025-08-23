@@ -6,6 +6,8 @@ Ce document présente les principales métriques d’évaluation en régression,
 
 ## 1. Erreur quadratique moyenne (MSE)
 
+![MSE](formula_mse.png)
+
 ### Définition
 \[
 MSE = \frac{1}{n} \sum_{i=1}^{n} (y_i - \hat{y}_i)^2
@@ -60,9 +62,8 @@ Le minimum est atteint pour la valeur optimale du paramètre \(\theta\).
 ## 4. Racine de l’erreur quadratique moyenne (RMSE)
 
 ### Définition
-\[
-RMSE = \sqrt{MSE}
-\]
+
+![RMSE](formula_rmse.png)
 
 - Exprimé dans la même unité que la variable cible.  
 - Interprétation plus intuitive que le MSE.  
@@ -73,9 +74,8 @@ RMSE = \sqrt{MSE}
 ## 5. Erreur absolue moyenne (MAE)
 
 ### Définition
-\[
-MAE = \frac{1}{n} \sum_{i=1}^{n} |y_i - \hat{y}_i|
-\]
+
+![MAE](formula_mae.png)
 
 - Moyenne des écarts absolus.  
 - Plus robuste aux valeurs aberrantes que MSE/RMSE.  
@@ -118,6 +118,7 @@ MAE = 0.5
 
 ## Formules principales
 - MSE  
+
 ![MSE](formula_mse.png)
 
 - RMSE  
