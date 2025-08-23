@@ -118,7 +118,7 @@ MAE = 0.5
 
 ## Formules principales
 - MSE  
-![MSE](sandbox:/mnt/data/formula_mse.png)
+![MSE](formula_mse.png)
 
 - RMSE  
 ![RMSE](sandbox:/mnt/data/formula_rmse.png)
